@@ -108,14 +108,84 @@ const CATEGORIES = [
       return [T1 * 10 + u1, '-', T2 * 10 + u2];
     },
   },
+  // Klok-generatoren geven [uur, minuten] terug.
+  {
+    id: 'klokUur', group: 'klok', kind: 'clock', label: 'Klok: hele uren', example: '07:00 = zeven uur',
+    gen: () => [rand(1, 12), 0],
+  },
+  {
+    id: 'klokHalf', group: 'klok', kind: 'clock', label: 'Klok: halve uren', example: '07:30 = half acht',
+    gen: () => [rand(1, 12), 30],
+  },
+  {
+    id: 'klokKwart', group: 'klok', kind: 'clock', label: 'Klok: kwart over en kwart voor', example: '07:15 = kwart over zeven',
+    gen: () => [rand(1, 12), pick([15, 45])],
+  },
+  {
+    id: 'klok5', group: 'klok', kind: 'clock', label: 'Klok: per 5 minuten', example: '07:20 = tien voor half acht',
+    gen: () => [rand(1, 12), pick([5, 10, 20, 25, 35, 40, 50, 55])],
+  },
+  {
+    id: 'klok24', group: 'klok', kind: 'clock', label: 'Klok: namiddag en avond (13:00 tot 23:59)', example: '14:30 = half drie \'s namiddags',
+    gen: () => [Math.random() < 0.8 ? rand(12, 23) : rand(6, 11), pick([0, 15, 30, 45])],
+  },
 ];
 const CAT_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
 
 const MODES = [
   { id: '20', title: 'Tot 20', emoji: '🎤', sub: 'plus en min tot 20' },
   { id: '100', title: 'Tot 100', emoji: '💎', sub: 'plus en min tot 100' },
-  { id: 'mix', title: 'Mix', emoji: '🌈', sub: 'alles door elkaar' },
+  { id: 'mix', title: 'Mix', emoji: '🌈', sub: 'plus en min door elkaar' },
+  { id: 'klok', title: 'Klok', emoji: '⏰', sub: 'digitale klok lezen' },
 ];
+
+// ---------- Klok: tijd in woorden ----------
+const HOUR_WORDS = ['twaalf', 'één', 'twee', 'drie', 'vier', 'vijf', 'zes', 'zeven', 'acht', 'negen', 'tien', 'elf'];
+const pad2 = (n) => String(n).padStart(2, '0');
+const digital = (h, m) => `${pad2(h)}:${pad2(m)}`;
+
+function dayPart(h) {
+  if (h < 6) return '\'s nachts';
+  if (h < 12) return '\'s morgens';
+  if (h < 14) return '\'s middags';
+  if (h < 18) return '\'s namiddags';
+  return '\'s avonds';
+}
+
+function clockWords(h, m, withDayPart = false) {
+  const cur = HOUR_WORDS[h % 12];
+  const next = HOUR_WORDS[(h + 1) % 12];
+  const words = {
+    0: `${cur} uur`,
+    5: `vijf over ${cur}`,
+    10: `tien over ${cur}`,
+    15: `kwart over ${cur}`,
+    20: `tien voor half ${next}`,
+    25: `vijf voor half ${next}`,
+    30: `half ${next}`,
+    35: `vijf over half ${next}`,
+    40: `tien over half ${next}`,
+    45: `kwart voor ${next}`,
+    50: `tien voor ${next}`,
+    55: `vijf voor ${next}`,
+  }[m];
+  return withDayPart ? `${words} ${dayPart(h)}` : words;
+}
+
+function clockHint(q) {
+  const { h, m } = q;
+  const h12 = h % 12 || 12;
+  const nh = (h + 1) % 24;
+  const parts = [];
+  if (h > 12) parts.push(`${h} uur is ${h} − 12 = ${h12} uur`);
+  if (m === 0) parts.push(`:00 betekent een heel uur`);
+  else if (m === 30) parts.push(`30 minuten is een half uur.<br>Half = halfweg naar ${HOUR_WORDS[nh % 12]} uur`);
+  else if (m < 20) parts.push(`${m} minuten na ${HOUR_WORDS[h % 12]} uur`);
+  else if (m < 30) parts.push(`nog ${30 - m} minuten tot ${digital(h, 30)}<br>(dat is half ${HOUR_WORDS[nh % 12]})`);
+  else if (m <= 40) parts.push(`${m - 30} minuten na ${digital(h, 30)}<br>(dat is half ${HOUR_WORDS[nh % 12]})`);
+  else parts.push(`nog ${60 - m} minuten tot ${HOUR_WORDS[nh % 12]} uur`);
+  return `${parts.join('<br>')}<br>→ <b>${clockWords(h, m, q.is24)}</b>`;
+}
 
 const RANKS = [
   { min: 0, name: 'Beginner', emoji: '🌱' },
@@ -135,15 +205,16 @@ const SETTING_FIELDS = [
   { key: 'questionsPerRound', label: 'Aantal oefeningen per ronde', type: 'number', min: 5, max: 50 },
   { key: 'timeLimitOn', label: 'Tijdslimiet per oefening', type: 'bool', help: 'Uit = geen tijdsdruk. Sneller antwoorden geeft nog steeds meer punten.' },
   { key: 'timeLimitSec', label: 'Tijd per oefening (seconden)', type: 'number', min: 3, max: 60 },
+  { key: 'clockTimeLimitSec', label: 'Tijd per klok-oefening (seconden)', type: 'number', min: 3, max: 90, help: 'Klokvragen vragen meer leeswerk. De grens voor volle punten schaalt mee.' },
   { key: 'fastSec', label: 'Volle punten als antwoord binnen (seconden)', type: 'number', min: 1, max: 30 },
   { key: 'maxPoints', label: 'Punten voor een snel juist antwoord', type: 'number', min: 1, max: 100 },
   { key: 'minPoints', label: 'Punten voor een traag juist antwoord', type: 'number', min: 0, max: 100 },
   { key: 'streakBonus', label: 'Bonuspunten per 5 juist op rij', type: 'number', min: 0, max: 100 },
   { key: 'answerMode', label: 'Manier van antwoorden', type: 'select', options: [['choices', 'Juiste antwoord aantikken (keuzes)'], ['numpad', 'Antwoord intikken op cijferpad']] },
-  { key: 'numChoices', label: 'Aantal keuzes', type: 'select', numeric: true, options: [['3', '3'], ['4', '4'], ['6', '6']] },
-  { key: 'repeatMistakes', label: 'Foute sommen later in de ronde herhalen', type: 'bool' },
-  { key: 'adaptive', label: 'Moeilijke sommen vaker vragen', type: 'bool', help: 'Sommen die vaak fout of traag gaan, komen vaker terug.' },
-  { key: 'showHints', label: 'Splitshulp tonen bij een fout', type: 'bool', help: 'Bv. 8 + 5 → 8 + 2 + 3 = 13' },
+  { key: 'numChoices', label: 'Aantal keuzes', help: 'Klok-oefeningen hebben altijd maximaal 4 keuzes.', type: 'select', numeric: true, options: [['3', '3'], ['4', '4'], ['6', '6']] },
+  { key: 'repeatMistakes', label: 'Foute oefeningen later in de ronde herhalen', type: 'bool' },
+  { key: 'adaptive', label: 'Moeilijke oefeningen vaker vragen', type: 'bool', help: 'Oefeningen die vaak fout of traag gaan, komen vaker terug.' },
+  { key: 'showHints', label: 'Hulp tonen bij een fout', type: 'bool', help: 'Splitsen (8 + 5 → 8 + 2 + 3) en uitleg bij de klok' },
   { key: 'sound', label: 'Geluidjes', type: 'bool' },
   { key: 'dailyCap', label: 'Max punten per dag (0 = onbeperkt)', type: 'number', min: 0, max: 100000 },
 ];
@@ -162,10 +233,12 @@ function defaultState() {
         add10: false, sub10: false,
         add20: true, add20b: true, sub20: true, sub20b: true,
         add100t: true, sub100t: true, add100: true, add100b: false, sub100: true, sub100b: false,
+        klokUur: true, klokHalf: true, klokKwart: true, klok5: false, klok24: false,
       },
       questionsPerRound: 10,
       timeLimitOn: true,
       timeLimitSec: 10,
+      clockTimeLimitSec: 15,
       fastSec: 3,
       maxPoints: 10,
       minPoints: 2,
@@ -381,11 +454,49 @@ function nextRank(total) {
 
 // ---------- Oefeningen kiezen ----------
 function enabledCats(mode) {
-  return CATEGORIES.filter((c) => state.settings.categories[c.id] && (mode === 'mix' || c.group === mode));
+  return CATEGORIES.filter((c) => state.settings.categories[c.id] &&
+    (mode === 'mix' ? c.group !== 'klok' : c.group === mode));
 }
 
 function makeQuestion(cat, a, op, b) {
-  return { a, op, b, answer: op === '+' ? a + b : a - b, key: `${a}${op}${b}`, cat: cat.id, group: cat.group };
+  return { kind: 'math', a, op, b, answer: op === '+' ? a + b : a - b, key: `${a}${op}${b}`, cat: cat.id, group: cat.group };
+}
+
+// Een klokvraag gaat willekeurig in één van twee richtingen:
+// digitale klok → woorden, of woorden → digitale klok.
+function makeClockQuestion(cat, h, m) {
+  const is24 = cat.id === 'klok24';
+  const dir = Math.random() < 0.5 ? 'toWords' : 'toDigital';
+  const words = clockWords(h, m, is24);
+  const digi = digital(h, m);
+  return {
+    kind: 'clock', cat: cat.id, group: cat.group, h, m, is24, dir, words, digi,
+    key: `klok:${digi}`, answer: dir === 'toWords' ? words : digi,
+  };
+}
+
+function buildQuestion(cat) {
+  return cat.kind === 'clock' ? makeClockQuestion(cat, ...cat.gen()) : makeQuestion(cat, ...cat.gen());
+}
+
+function factToQuestion(f) {
+  const cat = CAT_BY_ID[f.cat];
+  if (!cat) return null;
+  if (f.kind === 'clock') return makeClockQuestion(cat, f.h, f.m);
+  return f.a !== undefined ? makeQuestion(cat, f.a, f.op, f.b) : null;
+}
+
+function factLabel(f) {
+  if (f.kind === 'clock') return `${digital(f.h, f.m)} = ${clockWords(f.h, f.m, f.cat === 'klok24')}`;
+  return `${f.a} ${opSym(f.op)} ${f.b} = ${f.op === '+' ? f.a + f.b : f.a - f.b}`;
+}
+
+// Tijdslimiet en "snel"-grens voor een vraag (klokvragen krijgen meer leestijd).
+function timing(q) {
+  const s = state.settings;
+  const scale = q && q.kind === 'clock' ? s.clockTimeLimitSec / s.timeLimitSec : 1;
+  const limit = s.timeLimitSec * scale * 1000;
+  return { limit, fast: Math.min(s.fastSec * scale * 1000, limit) };
 }
 
 function factWeight(key) {
@@ -393,7 +504,7 @@ function factWeight(key) {
   if (!f) return 2;
   let w = 1 + (f.wrong / f.n) * 4;
   if (f.wrong > 0 && f.streak < 3) w += 2;
-  if (f.avgMs > state.settings.fastSec * 1000) w += 1.5;
+  if (f.avgMs > timing(f).fast) w += 1.5;
   if (f.streak >= 5) w *= 0.5;
   return w;
 }
@@ -415,21 +526,21 @@ function generateQuestion() {
   // Af en toe gericht een som herhalen die eerder moeilijk was.
   if (state.settings.adaptive && Math.random() < 0.35) {
     const weak = Object.entries(state.facts).filter(([key, f]) =>
-      catIds.has(f.cat) && f.wrong > 0 && f.streak < 3 && !round.recent.includes(key) && f.a !== undefined);
+      catIds.has(f.cat) && f.wrong > 0 && f.streak < 3 && !round.recent.includes(key));
     if (weak.length) {
       const [, f] = weightedPick(weak, ([key]) => factWeight(key));
-      return makeQuestion(CAT_BY_ID[f.cat], f.a, f.op, f.b);
+      const q = factToQuestion(f);
+      if (q) return q;
     }
   }
 
   const wanted = state.settings.adaptive ? 6 : 1;
   const candidates = [];
   for (let i = 0; i < 40 && candidates.length < wanted; i++) {
-    const cat = pick(cats);
-    const q = makeQuestion(cat, ...cat.gen());
+    const q = buildQuestion(pick(cats));
     if (!round.recent.includes(q.key) && !candidates.some((c) => c.key === q.key)) candidates.push(q);
   }
-  if (!candidates.length) { const cat = pick(cats); return makeQuestion(cat, ...cat.gen()); }
+  if (!candidates.length) return buildQuestion(pick(cats));
   return state.settings.adaptive ? weightedPick(candidates, (q) => factWeight(q.key)) : candidates[0];
 }
 
@@ -443,6 +554,29 @@ function makeChoices(answer, n, maxVal) {
     if (v >= 0 && v <= maxVal) set.add(v);
   }
   while (set.size < n) set.add(rand(0, maxVal));
+  return shuffle([...set]);
+}
+
+// Foute keuzes op basis van typische vergissingen:
+// half acht ↔ half zeven, kwart over ↔ kwart voor, 14:00 ↔ 04:00 / 02:00.
+function makeClockChoices(q, n) {
+  const { h, m, is24 } = q;
+  const norm = (x) => (is24 ? ((x % 24) + 24) % 24 : ((((x - 1) % 12) + 12) % 12) + 1);
+  const mirror = (60 - m) % 60;
+  const near = [[h - 1, m], [h + 1, m]];
+  if (m % 30 !== 0) near.push([h, mirror], [h + 1, mirror], [h - 1, mirror]);
+  else near.push([h, (m + 30) % 60]);
+  if (is24) near.push([h - 12, m], [h + 2, m]);
+  const far = [[h + 2, m], [h - 2, m], [h, (m + 15) % 60], [h, (m + 45) % 60], [h - 10, m]];
+
+  const show = (hh, mm) => (q.dir === 'toWords' ? clockWords(hh, mm, is24) : digital(hh, mm));
+  const set = new Set([q.answer]);
+  for (const [hh, mm] of [...shuffle(near), ...shuffle(far)]) {
+    if (set.size >= n) break;
+    set.add(show(norm(hh), mm));
+  }
+  const cat = CAT_BY_ID[q.cat];
+  for (let i = 0; set.size < n && i < 50; i++) set.add(show(...cat.gen()));
   return shuffle([...set]);
 }
 
@@ -468,7 +602,10 @@ function splitHint(a, op, b) {
 }
 
 function recordFact(q, correct, ms) {
-  const f = state.facts[q.key] || (state.facts[q.key] = { cat: q.cat, a: q.a, op: q.op, b: q.b, n: 0, wrong: 0, streak: 0, avgMs: 0 });
+  const base = q.kind === 'clock'
+    ? { kind: 'clock', cat: q.cat, h: q.h, m: q.m }
+    : { cat: q.cat, a: q.a, op: q.op, b: q.b };
+  const f = state.facts[q.key] || (state.facts[q.key] = { ...base, n: 0, wrong: 0, streak: 0, avgMs: 0 });
   f.n++;
   if (correct) {
     f.streak++;
@@ -481,10 +618,9 @@ function recordFact(q, correct, ms) {
 }
 
 // ---------- Punten ----------
-function calcPoints(ms) {
+function calcPoints(ms, q) {
   const s = state.settings;
-  const limit = s.timeLimitSec * 1000;
-  const fast = Math.min(s.fastSec * 1000, limit);
+  const { limit, fast } = timing(q);
   const max = s.maxPoints, min = Math.min(s.minPoints, max);
   if (ms <= fast) return max;
   if (ms >= limit) return min;
@@ -517,7 +653,8 @@ function renderHome() {
   const rankPct = next ? Math.round((state.totalEarned - rank.min) / (next.min - rank.min) * 100) : 100;
   const has20 = enabledCats('20').length > 0;
   const has100 = enabledCats('100').length > 0;
-  const modes = MODES.filter((m) => (m.id === '20' ? has20 : m.id === '100' ? has100 : has20 && has100));
+  const hasKlok = enabledCats('klok').length > 0;
+  const modes = MODES.filter((m) => ({ 20: has20, 100: has100, mix: has20 && has100, klok: hasKlok })[m.id]);
   const pending = state.redemptions.filter((r) => r.status === 'pending').length;
   const name = state.childName ? `, ${esc(state.childName)}` : '';
 
@@ -618,17 +755,36 @@ function nextQuestion() {
 function renderPlay() {
   const s = state.settings;
   const q = round.q;
-  const numpad = s.answerMode === 'numpad';
+  const isClock = q.kind === 'clock';
+  const numpad = s.answerMode === 'numpad' && !isClock;
   const remaining = (round.planned - round.newAsked) + round.retries.length;
   const pct = Math.round(round.done / (round.done + remaining + 1) * 100);
-  if (!numpad) q.choices = makeChoices(q.answer, s.numChoices, q.group === '100' ? 100 : 20);
+  if (isClock) q.choices = makeClockChoices(q, Math.min(4, s.numChoices));
+  else if (!numpad) q.choices = makeChoices(q.answer, s.numChoices, q.group === '100' ? 100 : 20);
 
+  const choiceCls = isClock ? (q.dir === 'toWords' ? 'word-choice' : 'digi-choice') : '';
   const answersHtml = numpad
     ? numpadHtml()
-    : `<div class="choices n${q.choices.length}">${q.choices.map((v) => `<button class="choice" data-val="${v}">${v}</button>`).join('')}</div>`;
+    : `<div class="choices n${q.choices.length}">${q.choices.map((v, i) =>
+      `<button class="choice ${choiceCls}" data-idx="${i}">${v}</button>`).join('')}</div>`;
+
+  let questionHtml;
+  if (!isClock) {
+    questionHtml = `<div class="question">${q.a} ${opSym(q.op)} ${q.b} = <span class="slot" id="slot">?</span></div>`;
+  } else if (q.dir === 'toWords') {
+    questionHtml = `
+      <div class="clock-prompt">Hoe zeg je deze tijd?</div>
+      <div class="digi-clock">${pad2(q.h)}<span class="colon">:</span>${pad2(q.m)}</div>
+      <div class="slot word-slot" id="slot">?</div>`;
+  } else {
+    questionHtml = `
+      <div class="clock-prompt">Welke klok toont deze tijd?</div>
+      <div class="clock-words">${q.words}</div>
+      <div class="digi-clock slot digi-slot" id="slot">--<span class="colon">:</span>--</div>`;
+  }
 
   app.innerHTML = `
-  <section class="screen play ${numpad ? 'mode-numpad' : 'mode-choices'}">
+  <section class="screen play ${numpad ? 'mode-numpad' : 'mode-choices'} ${isClock ? 'mode-clock' : ''}">
     <header class="play-top">
       <button class="icon-btn" data-act="quit" aria-label="Stoppen">✕</button>
       <div class="lightstick"><div class="lightstick-fill" style="width:${pct}%"><span class="lightstick-head">💜</span></div></div>
@@ -640,9 +796,7 @@ function renderPlay() {
           ${q.isRetry ? '<span class="tag retry">🔁 Nog eens!</span>' : ''}
           ${round.streak >= 2 ? `<span class="tag combo">🔥 ${round.streak} op rij</span>` : ''}
         </div>
-        <div class="question-card" id="qcard">
-          <div class="question">${q.a} ${opSym(q.op)} ${q.b} = <span class="slot" id="slot">?</span></div>
-        </div>
+        <div class="question-card" id="qcard">${questionHtml}</div>
         <div class="timer ${s.timeLimitOn ? '' : 'no-limit'}">
           <div class="timer-fill" id="timer-fill"></div>
           <span class="timer-pts" id="timer-pts">+${s.maxPoints} ⭐</span>
@@ -662,7 +816,7 @@ function renderPlay() {
       onOk: (v) => handleAnswer(Number(v)),
     });
   } else {
-    $$('.choice', app).forEach((b) => b.addEventListener('click', () => handleAnswer(Number(b.dataset.val), b)));
+    $$('.choice', app).forEach((b) => b.addEventListener('click', () => handleAnswer(q.choices[b.dataset.idx], b)));
   }
 
   round.locked = false;
@@ -674,13 +828,13 @@ function tick() {
   if (!round || round.locked) return;
   const s = state.settings;
   const elapsed = performance.now() - round.t0;
-  const limit = s.timeLimitSec * 1000;
+  const { limit } = timing(round.q);
   const frac = clamp(1 - elapsed / limit, 0, 1);
   const fill = $('#timer-fill');
   if (fill) {
     fill.style.transform = `scaleX(${frac})`;
     fill.dataset.level = frac > 0.6 ? 'high' : frac > 0.3 ? 'mid' : 'low';
-    $('#timer-pts').textContent = `+${calcPoints(elapsed)} ⭐`;
+    $('#timer-pts').textContent = `+${calcPoints(elapsed, round.q)} ⭐`;
   }
   if (s.timeLimitOn && elapsed >= limit) { handleAnswer(null); return; }
   round.raf = requestAnimationFrame(tick);
@@ -704,7 +858,7 @@ function handleAnswer(value, btn) {
     round.bestStreak = Math.max(round.bestStreak, round.streak);
     round.times.push(ms);
     const bonus = s.streakBonus > 0 && round.streak % 5 === 0 ? s.streakBonus : 0;
-    const got = awardPoints(calcPoints(ms) + bonus);
+    const got = awardPoints(calcPoints(ms, q) + bonus);
     round.points += got;
     save();
     showCorrect(btn, got, bonus, ms);
@@ -726,7 +880,7 @@ function showCorrect(btn, got, bonus, ms) {
   if (btn) btn.classList.add('right');
   $$('.choice', app).forEach((b) => { if (b !== btn) b.classList.add('dim'); });
 
-  const fast = ms <= state.settings.fastSec * 1000;
+  const fast = ms <= timing(round.q).fast;
   const praise = $('#praise');
   praise.textContent = bonus ? `${pick(COMBO_TEXT)} +${bonus} bonus` : pick(fast ? PRAISE_FAST : PRAISE_OK);
   praise.className = `praise show ${bonus ? 'combo' : ''}`;
@@ -747,18 +901,24 @@ function showWrong(value, btn) {
   slot.classList.add('reveal');
   if (btn) btn.classList.add('wrong');
   $$('.choice', app).forEach((b) => {
-    if (Number(b.dataset.val) === q.answer) b.classList.add('right');
+    if (q.choices[b.dataset.idx] === q.answer) b.classList.add('right');
     else if (b !== btn) b.classList.add('dim');
   });
   Sound.play('wrong');
 
-  const hint = state.settings.showHints ? splitHint(q.a, q.op, q.b) : '';
+  const isClock = q.kind === 'clock';
+  const showHints = state.settings.showHints;
+  const hint = !showHints ? '' : isClock ? clockHint(q) : splitHint(q.a, q.op, q.b);
+  const hintTitle = isClock ? '💡 Zo lees je de klok:' : '💡 Zo kan je het splitsen:';
+  const eq = isClock
+    ? `<span class="digi-inline">${q.digi}</span> = <b>${q.words}</b>`
+    : `${q.a} ${opSym(q.op)} ${q.b} = <b>${q.answer}</b>`;
   const m = openModal(`
     <div class="wrong-panel">
       <div class="wrong-title">${timedOut ? '⏰ Tijd om!' : 'Oei, bijna! 💪'}</div>
-      <div class="wrong-eq">${q.a} ${opSym(q.op)} ${q.b} = <b>${q.answer}</b></div>
+      <div class="wrong-eq ${isClock ? 'clock' : ''}">${eq}</div>
       ${!timedOut ? `<div class="wrong-your">Jij koos <s>${value}</s></div>` : ''}
-      ${hint ? `<div class="hint"><span>💡 Zo kan je het splitsen:</span><div>${hint}</div></div>` : ''}
+      ${hint ? `<div class="hint"><span>${hintTitle}</span><div>${hint}</div></div>` : ''}
       <button class="btn big primary next-btn" disabled>Verder ▶</button>
     </div>`, { cls: 'wrong-card' });
   const next = $('.next-btn', m.el);
@@ -1092,6 +1252,7 @@ function parentPracticeHtml() {
     ${none ? '<p class="warn">⚠️ Er staat geen enkele soort oefening aan. Je kind kan nu niet oefenen.</p>' : ''}
     ${group('20', 'Tot 20')}
     ${group('100', 'Tot 100')}
+    ${group('klok', 'Digitale klok')}
   </div>
   <div class="panel">
     <h2>Spelregels</h2>
@@ -1115,7 +1276,7 @@ function parentProgressHtml() {
   }).filter((x) => x.n > 0);
 
   const hardest = facts
-    .filter(([, f]) => f.n >= 2 && (f.wrong > 0 || f.avgMs > state.settings.fastSec * 1000))
+    .filter(([, f]) => f.n >= 2 && (f.wrong > 0 || f.avgMs > timing(f).fast))
     .sort(([, x], [, y]) => (y.wrong / y.n - x.wrong / x.n) || (y.avgMs - x.avgMs))
     .slice(0, 15);
 
@@ -1145,13 +1306,13 @@ function parentProgressHtml() {
   </div>
 
   <div class="panel">
-    <h2>Moeilijkste sommen</h2>
-    <p class="muted">Sommen die vaak fout gaan of traag zijn. Deze komen automatisch vaker terug als "moeilijke sommen vaker vragen" aan staat.</p>
+    <h2>Moeilijkste oefeningen</h2>
+    <p class="muted">Oefeningen die vaak fout gaan of traag zijn. Deze komen automatisch vaker terug als "moeilijke oefeningen vaker vragen" aan staat.</p>
     ${hardest.length ? `<div class="fact-list">${hardest.map(([, f]) => `
       <div class="fact">
-        <b>${f.a} ${opSym(f.op)} ${f.b} = ${f.op === '+' ? f.a + f.b : f.a - f.b}</b>
+        <b>${factLabel(f)}</b>
         <small>${f.wrong}× fout van ${f.n} · ${f.avgMs ? fmtSec(f.avgMs) : 'nog nooit juist'}</small>
-      </div>`).join('')}</div>` : '<p class="muted">Nog geen moeilijke sommen gevonden. 👍</p>'}
+      </div>`).join('')}</div>` : '<p class="muted">Nog geen moeilijke oefeningen gevonden. 👍</p>'}
   </div>
 
   <div class="panel">

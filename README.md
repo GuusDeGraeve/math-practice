@@ -1,6 +1,6 @@
 # Reken Idol ⭐
 
-Oefen-app voor optellen en aftrekken tot 20 en tot 100, gemaakt voor een touchscreen-Chromebook.
+Oefen-app voor optellen en aftrekken tot 20 en tot 100 en voor het lezen van de digitale klok, gemaakt voor een touchscreen-Chromebook.
 Hoe sneller het juiste antwoord, hoe meer punten. Punten zijn in te wisselen voor beloningen die de ouder zelf instelt.
 
 ## Gebruiken
@@ -14,6 +14,7 @@ Maak af en toe een backup via **Ouders → Algemeen → Backup downloaden**.
 Via de knop **🔒 Ouders** rechtsonder, beschermd met een rekenvraag (bv. 17 × 8) of een zelf gekozen pincode. Daar stel je in:
 
 - welke soorten oefeningen aan staan (tot 10, tot 20 met/zonder brug, tientallen, tot 100 met/zonder brug)
+- welke klok-oefeningen aan staan (hele uren, halve uren, kwart over/voor, per 5 minuten, namiddag en avond)
 - spelregels: aantal vragen, tijdslimiet, punten, bonus, keuzes of cijferpad, max punten per dag
 - beloningen en openstaande aanvragen
 - voortgang: juist-percentage, gemiddelde tijd en moeilijkste sommen
